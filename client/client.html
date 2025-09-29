@@ -1,36 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Our simple HTTP server</title>
+  <meta charset="utf-8" />
+  <title>HTTP API II - Client</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
-  
-  <script>
-
-  </script>
 </head>
 <body>
   <section id="top">
-    <h3>POST Status Code Tests</h3>
-    <form id="nameForm" action="/addUser" method="post">
-      <label for="name">Name: </label>
-      <input id="nameField" type="text" name="name" />
-      <label for="age">Age: </label>
-      <input id="ageField" type="number" name="age" min="0" max="100" step="1"/>
-      <input type="submit" value="Add User" />
-    </form>
-    <form id="userForm" action="/getUsers" method="get">
-      <select id='urlField'>
-        <option value='/getUsers'>/getUsers</option>
-        <option value='/notReal'>/notReal</option>
+    <h3>HTTP API II - Test Client</h3>
+
+    <div style="margin-bottom: 12px;">
+      <label for="endpoint">Endpoint:</label>
+      <select id="endpoint">
+        <option value="/getUsers">/getUsers</option>
+        <option value="/notReal">/notReal</option>
       </select>
-      <select id="methodSelect">
-        <option value="get">GET</option>
-        <option value="head">HEAD</option>
+
+      <label for="method" style="margin-left: 12px;">Method:</label>
+      <select id="method">
+        <option value="GET">GET</option>
+        <option value="HEAD">HEAD</option>
       </select>
-      <input type="submit" value="Get User" />
-    </form>
+
+      <button id="getBtn" style="margin-left: 12px;">Get User</button>
+    </div>
+
+    <hr />
+
+    <div style="margin-top: 12px;">
+      <h4>Add or Update User (POST /addUser)</h4>
+      <label for="name">Name:</label>
+      <input type="text" id="name" placeholder="e.g., bob" />
+      <label for="age" style="margin-left: 8px;">Age:</label>
+      <input type="number" id="age" placeholder="e.g., 28" style="width: 80px;" />
+      <button id="addBtn" style="margin-left: 12px;">Add User</button>
+    </div>
   </section>
-  <section id="content">
+
+  <section id="content" style="margin-top: 20px;">
+
   </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const endpointSel = document.getElementById('endpoint');
+      const methodSel = document.getElementById('method');
+      const getBtn = document.getElementById('getBtn');
+      const addBtn = document.getElementById('addBtn');
+      const nameInput = document.getElementById('name');
+      const ageInput = document.getElementById('age');
+      const content = document.getElementById('content');
+
+      getBtn.addEventListener('click', () => {
+        const path = endpointSel.value;
+        const method = methodSel.value;
+
+        fetch(path, {
+          method,
+          headers: {
+            Accept: 'application/json',
+          },
+        }).then((res) => {
+          if (method === 'HEAD') {
+            content.innerHTML = `<p><strong>Status:</strong> ${res.status} ${res.statusText}</p>`;
+            console.log('HEAD request - no body to parse.');
+            return;
+          }
+
+          return res.text().then((text) => {
+            console.log('Raw response text:', text);
+
+            let obj = null;
+            try {
+              obj = JSON.parse(text);
+            } catch (e) {
+              console.error('JSON parse error', e);
+            }
+
+            let html = `<p><strong>Status:</strong> ${res.status} ${res.statusText}</p>`;
+
+            if (res.status >= 400) {
+              if (obj) {
+                if (obj.message) html += `<p><strong>Message:</strong> ${obj.message}</p>`;
+                if (obj.id) html += `<p><strong>ID:</strong> ${obj.id}</p>`;
+              } else {
+                html += `<pre>${text}</pre>`;
+              }
+            } else {
+              if (obj && obj.users) {
+                html += '<h4>Users</h4><ul>';
+                Object.keys(obj.users).forEach((key) => {
+                  const u = obj.users[key];
+                  html += `<li><strong>${u.name}</strong> — Age: ${u.age}</li>`;
+                });
+                html += '</ul>';
+              } else if (obj && obj.message) {
+                html += `<p>${obj.message}</p>`;
+              } else {
+                html += `<pre>${text}</pre>`;
+              }
+            }
+
+            content.innerHTML = html;
+          });
+        }).catch((err) => {
+          console.error(err);
+          content.innerHTML = '<p>An error occurred making the request.</p>';
+        });
+      });
+
+      addBtn.addEventListener('click', () => {
+        const name = (nameInput.value || '').trim();
+        const age = ageInput.value;
+
+        const body = new URLSearchParams({ name, age }).toString();
+
+        fetch('/addUser', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+          },
+          body,
+        }).then((res) => {
+          if (res.status === 204) {
+            content.innerHTML = `<p><strong>Status:</strong> 204 No Content — user updated.</p>`;
+            console.log('Raw response text: [no content]');
+            return;
+          }
+
+          return res.text().then((text) => {
+            console.log('Raw response text:', text);
+
+            let obj = null;
+            try {
+              obj = JSON.parse(text);
+            } catch (e) {
+              console.error('JSON parse error', e);
+            }
+
+            let html = `<p><strong>Status:</strong> ${res.status} ${res.statusText}</p>`;
+
+            if (res.status >= 400) {
+              if (obj && obj.message) {
+                html += `<p><strong>Message:</strong> ${obj.message}</p>`;
+                if (obj.id) html += `<p><strong>ID:</strong> ${obj.id}</p>`;
+              } else {
+                html += `<pre>${text}</pre>`;
+              }
+            } else {
+              if (obj && obj.message) {
+                html += `<p>${obj.message}</p>`;
+              } else {
+                html += `<pre>${text}</pre>`;
+              }
+            }
+
+            content.innerHTML = html;
+          });
+        }).catch((err) => {
+          console.error(err);
+          content.innerHTML = '<p>An error occurred making the request.</p>';
+        });
+      });
+    });
+  </script>
 </body>
 </html>
